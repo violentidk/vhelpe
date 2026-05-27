@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function UploadZone() {
+  const MAX_PLATFORM_UPLOAD_MB = 4;
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -21,6 +22,12 @@ export function UploadZone() {
     const extension = incoming.name.split(".").pop()?.toLowerCase();
     if (!["pdf", "docx"].includes(extension || "")) {
       setError("Only PDF and DOCX files are supported.");
+      return;
+    }
+    if (incoming.size > MAX_PLATFORM_UPLOAD_MB * 1024 * 1024) {
+      setError(
+        `File is too large for direct upload on Vercel serverless (${MAX_PLATFORM_UPLOAD_MB}MB max request body).`,
+      );
       return;
     }
 
@@ -43,7 +50,20 @@ export function UploadZone() {
         body: formData,
       });
 
-      const data = await response.json();
+      const rawBody = await response.text();
+      let data: { error?: string; analysis_id?: string } = {};
+      try {
+        data = rawBody ? (JSON.parse(rawBody) as typeof data) : {};
+      } catch {
+        if (!response.ok) {
+          throw new Error(
+            rawBody.startsWith("Request Entity Too Large")
+              ? `Upload rejected by platform limit. Keep file under ${MAX_PLATFORM_UPLOAD_MB}MB or switch to direct-to-storage upload.`
+              : rawBody || "Upload failed.",
+          );
+        }
+      }
+
       if (!response.ok) {
         throw new Error(data.error || "Upload failed.");
       }
