@@ -1,0 +1,18 @@
+import { redirect } from "next/navigation";
+import { AppShell } from "@/components/app-shell";
+import { PlannerBoard } from "@/components/planner-board";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+export default async function PlannerPage() {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  return (
+    <AppShell>
+      <PlannerBoard />
+    </AppShell>
+  );
+}
