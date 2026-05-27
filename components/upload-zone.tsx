@@ -6,9 +6,9 @@ import { motion } from "framer-motion";
 import { FileUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 export function UploadZone() {
-  const MAX_PLATFORM_UPLOAD_MB = 4;
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -24,12 +24,6 @@ export function UploadZone() {
       setError("Only PDF and DOCX files are supported.");
       return;
     }
-    if (incoming.size > MAX_PLATFORM_UPLOAD_MB * 1024 * 1024) {
-      setError(
-        `File is too large for direct upload on Vercel serverless (${MAX_PLATFORM_UPLOAD_MB}MB max request body).`,
-      );
-      return;
-    }
 
     setError(null);
     setFile(incoming);
@@ -42,12 +36,36 @@ export function UploadZone() {
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      const supabase = createBrowserSupabaseClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error("You must be logged in to upload.");
+      }
+
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+      const storagePath = `${user.id}/${Date.now()}-${safeFileName}`;
+      const bucket = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || "theses";
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(storagePath, file, { contentType: file.type || "application/octet-stream" });
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
 
       const response = await fetch("/api/thesis/analyze", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          storagePath,
+          fileName: safeFileName,
+          mimeType: file.type || "application/octet-stream",
+        }),
       });
 
       const rawBody = await response.text();
@@ -56,11 +74,7 @@ export function UploadZone() {
         data = rawBody ? (JSON.parse(rawBody) as typeof data) : {};
       } catch {
         if (!response.ok) {
-          throw new Error(
-            rawBody.startsWith("Request Entity Too Large")
-              ? `Upload rejected by platform limit. Keep file under ${MAX_PLATFORM_UPLOAD_MB}MB or switch to direct-to-storage upload.`
-              : rawBody || "Upload failed.",
-          );
+          throw new Error(rawBody || "Upload failed.");
         }
       }
 

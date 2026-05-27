@@ -43,6 +43,7 @@ Copy-Item .env.example .env.local
 3. Fill environment variables:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET` (`theses` by default)
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_STORAGE_BUCKET` (`theses` by default)
 - `GEMINI_API_KEY`

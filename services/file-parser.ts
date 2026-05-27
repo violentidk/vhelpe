@@ -5,9 +5,11 @@ function fileToBuffer(file: File): Promise<Buffer> {
   return file.arrayBuffer().then((ab) => Buffer.from(ab));
 }
 
-export async function extractThesisText(file: File): Promise<string> {
-  const extension = file.name.split(".").pop()?.toLowerCase();
-  const buffer = await fileToBuffer(file);
+export async function extractThesisTextFromBuffer(
+  buffer: Buffer,
+  fileName: string,
+): Promise<string> {
+  const extension = fileName.split(".").pop()?.toLowerCase();
 
   if (extension === "pdf") {
     const parsed = await pdfParse(buffer);
@@ -20,4 +22,9 @@ export async function extractThesisText(file: File): Promise<string> {
   }
 
   throw new Error("Unsupported file type. Please upload PDF or DOCX.");
+}
+
+export async function extractThesisText(file: File): Promise<string> {
+  const buffer = await fileToBuffer(file);
+  return extractThesisTextFromBuffer(buffer, file.name);
 }

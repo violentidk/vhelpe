@@ -27,3 +27,9 @@ export const plannerTaskPatchSchema = z.object({
   progress: z.number().int().min(0).max(100).optional(),
   status: z.enum(["todo", "in_progress", "done"]).optional(),
 });
+
+export const thesisAnalyzeStorageSchema = z.object({
+  storagePath: z.string().trim().min(3).max(2048),
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(255).optional(),
+});
