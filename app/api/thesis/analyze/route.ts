@@ -16,6 +16,25 @@ interface PreparedThesisInput {
   text: string;
 }
 
+function toErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (error && typeof error === "object") {
+    const maybeMessage = (error as { message?: unknown }).message;
+    const maybeDetails = (error as { details?: unknown }).details;
+    const maybeHint = (error as { hint?: unknown }).hint;
+    const parts = [maybeMessage, maybeDetails, maybeHint]
+      .filter((part): part is string => typeof part === "string" && part.trim().length > 0);
+    if (parts.length) {
+      return parts.join(" | ");
+    }
+  }
+
+  return fallback;
+}
+
 function getSafeFileName(fileName: string): string {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
 }
@@ -48,7 +67,7 @@ async function persistAnalysis(
     .single();
 
   if (thesisError || !thesis) {
-    throw thesisError ?? new Error("Failed to save thesis metadata.");
+    throw new Error(toErrorMessage(thesisError, "Failed to save thesis metadata."));
   }
 
   const analysis = await runThesisAnalysisPipeline(thesisInput.text, {
@@ -76,7 +95,7 @@ async function persistAnalysis(
     .single();
 
   if (analysisError || !savedAnalysis) {
-    throw analysisError ?? new Error("Failed to save analysis.");
+    throw new Error(toErrorMessage(analysisError, "Failed to save analysis."));
   }
 
   await service.from("thesis_versions").insert({
@@ -127,7 +146,7 @@ export async function POST(request: Request) {
         .from(bucket)
         .download(storagePath);
       if (downloadError || !storedFile) {
-        throw downloadError ?? new Error("Failed to download uploaded file.");
+        throw new Error(toErrorMessage(downloadError, "Failed to download uploaded file."));
       }
 
       if (storedFile.size > maxBytes) {
@@ -192,7 +211,7 @@ export async function POST(request: Request) {
         });
 
       if (uploadError) {
-        throw uploadError;
+        throw new Error(toErrorMessage(uploadError, "Failed to upload file to storage."));
       }
 
       thesisInput = {
@@ -215,7 +234,7 @@ export async function POST(request: Request) {
       report: persisted.report,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    const message = toErrorMessage(error, "Unknown error");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
